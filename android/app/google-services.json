@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "454194038459",
+    "project_id": "tapart-c309d",
+    "storage_bucket": "tapart-c309d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:454194038459:android:28a77ba3d771df113d0b9e",
+        "android_client_info": {
+          "package_name": "com.example.prelimproj"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCvY8a4k18bbhLyGY1zTzbuU7--9TgTTI8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

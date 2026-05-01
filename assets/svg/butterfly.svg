@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+
+//guide ok na to
+  <!-- ============================================================ -->
+  <!-- BUTTERFLY COLORING PAGE                                       -->
+  <!-- All regions: fill="#FFFFFF" stroke="#000000" stroke-width="2" -->
+  <!-- ============================================================ -->
+
+  <!-- ==================== UPPER LEFT WING ======================= -->
+
+  <!-- UL Wing Cell 1: top-outer lobe -->
+  <path d="M200,180 C190,160 170,130 140,110 C120,98 95,90 75,95 C55,100 40,115 38,135 C36,155 50,175 70,185 C90,195 115,192 135,185 C158,177 180,172 200,180 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- UL Wing Cell 2: mid-outer lobe -->
+  <path d="M200,180 C185,175 165,172 145,175 C125,178 105,185 90,195 C75,205 65,220 68,238 C71,256 88,268 108,270 C128,272 148,262 162,248 C178,232 192,210 200,195 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- UL Wing Cell 3: lower-outer lobe -->
+  <path d="M200,195 C192,210 182,228 172,244 C162,260 150,272 138,278 C126,284 112,282 102,274 C92,266 88,252 92,238 C96,224 108,214 122,208 C140,200 170,196 200,195 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- UL Wing Cell 4: inner-top band -->
+  <path d="M200,180 C190,160 175,145 158,138 C141,131 122,132 108,140 C94,148 86,162 88,178 C90,194 102,204 118,207 C138,210 165,200 200,195 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- UL Wing Cell 5: inner-mid band -->
+  <path d="M200,195 C165,200 138,210 120,218 C102,226 92,238 94,252 C96,266 110,274 126,272 C142,270 156,258 166,244 C178,228 192,210 200,195 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- UL Wing Cell 6: near-body triangle -->
+  <path d="M200,180 C188,178 175,178 165,182 C155,186 148,194 150,204 C152,214 162,220 174,218 C186,216 196,206 200,195 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- UL Wing Spot 1 -->
+  <circle cx="110" cy="130" r="12" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- UL Wing Spot 2 -->
+  <circle cx="80" cy="165" r="9" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- ==================== UPPER RIGHT WING ====================== -->
+
+  <!-- UR Wing Cell 1: top-outer lobe -->
+  <path d="M200,180 C210,160 230,130 260,110 C280,98 305,90 325,95 C345,100 360,115 362,135 C364,155 350,175 330,185 C310,195 285,192 265,185 C242,177 220,172 200,180 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- UR Wing Cell 2: mid-outer lobe -->
+  <path d="M200,180 C215,175 235,172 255,175 C275,178 295,185 310,195 C325,205 335,220 332,238 C329,256 312,268 292,270 C272,272 252,262 238,248 C222,232 208,210 200,195 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- UR Wing Cell 3: lower-outer lobe -->
+  <path d="M200,195 C208,210 218,228 228,244 C238,260 250,272 262,278 C274,284 288,282 298,274 C308,266 312,252 308,238 C304,224 292,214 278,208 C260,200 230,196 200,195 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- UR Wing Cell 4: inner-top band -->
+  <path d="M200,180 C210,160 225,145 242,138 C259,131 278,132 292,140 C306,148 314,162 312,178 C310,194 298,204 282,207 C262,210 235,200 200,195 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- UR Wing Cell 5: inner-mid band -->
+  <path d="M200,195 C235,200 262,210 280,218 C298,226 308,238 306,252 C304,266 290,274 274,272 C258,270 244,258 234,244 C222,228 208,210 200,195 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- UR Wing Cell 6: near-body triangle -->
+  <path d="M200,180 C212,178 225,178 235,182 C245,186 252,194 250,204 C248,214 238,220 226,218 C214,216 204,206 200,195 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- UR Wing Spot 1 -->
+  <circle cx="290" cy="130" r="12" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- UR Wing Spot 2 -->
+  <circle cx="320" cy="165" r="9" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- ==================== LOWER LEFT WING ======================= -->
+
+  <!-- LL Wing Cell 1: outer lobe -->
+  <path d="M200,210 C185,215 165,222 145,232 C125,242 108,258 100,276 C92,294 96,314 110,326 C124,338 144,338 162,330 C180,322 192,306 198,288 C204,270 204,240 200,210 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- LL Wing Cell 2: inner lobe -->
+  <path d="M200,210 C196,230 194,252 196,272 C198,292 204,308 212,318 C220,328 230,330 238,324 C246,318 248,304 244,290 C240,276 230,264 218,254 C208,244 202,228 200,210 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- LL Wing Cell 3: bottom tip -->
+  <path d="M200,210 C188,240 178,268 172,292 C166,316 168,336 178,344 C188,352 202,348 210,338 C218,328 218,310 214,290 C210,270 206,240 200,210 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- LL Wing Spot -->
+  <circle cx="140" cy="270" r="10" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- ==================== LOWER RIGHT WING ====================== -->
+
+  <!-- LR Wing Cell 1: outer lobe -->
+  <path d="M200,210 C215,215 235,222 255,232 C275,242 292,258 300,276 C308,294 304,314 290,326 C276,338 256,338 238,330 C220,322 208,306 202,288 C196,270 196,240 200,210 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- LR Wing Cell 2: inner lobe -->
+  <path d="M200,210 C204,230 206,252 204,272 C202,292 196,308 188,318 C180,328 170,330 162,324 C154,318 152,304 156,290 C160,276 170,264 182,254 C192,244 198,228 200,210 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- LR Wing Cell 3: bottom tip -->
+  <path d="M200,210 C212,240 222,268 228,292 C234,316 232,336 222,344 C212,352 198,348 190,338 C182,328 182,310 186,290 C190,270 194,240 200,210 Z"
+        fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- LR Wing Spot -->
+  <circle cx="260" cy="270" r="10" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- ========================= BODY ============================ -->
+
+  <!-- Head -->
+  <ellipse cx="200" cy="162" rx="14" ry="14" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- Thorax -->
+  <ellipse cx="200" cy="192" rx="12" ry="18" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- Abdomen upper -->
+  <ellipse cx="200" cy="222" rx="10" ry="16" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- Abdomen lower -->
+  <ellipse cx="200" cy="248" rx="8" ry="14" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- Abdomen tip -->
+  <ellipse cx="200" cy="270" rx="6" ry="10" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- ======================= ANTENNAE ========================== -->
+
+  <!-- Left antenna stem -->
+  <path d="M194,150 C185,135 172,118 162,105" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Left antenna loop/circle -->
+  <circle cx="158" cy="100" r="7" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+  <!-- Right antenna stem -->
+  <path d="M206,150 C215,135 228,118 238,105" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Right antenna loop/circle -->
+  <circle cx="242" cy="100" r="7" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+
+</svg>
