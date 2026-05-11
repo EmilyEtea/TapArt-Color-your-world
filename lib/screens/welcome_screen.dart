@@ -12,7 +12,8 @@ class WelcomeScreen extends StatefulWidget {
   State<WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
-// TickerProviderStateMixin kasi dalawa ang controller — bounce + tab
+// need TickerProviderStateMixin kasi dalawa ang AnimationController
+// yung isa para sa tab, yung isa para sa floating logo
 class _WelcomeScreenState extends State<WelcomeScreen>
     with TickerProviderStateMixin {
   final _auth = AuthService();
@@ -29,7 +30,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   bool _isLoading = false;
   String? _errorText;
 
-  // yung float animation ng logo
   late AnimationController _floatCtrl;
   late Animation<double> _floatAnim;
 
@@ -38,12 +38,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     super.initState();
 
     _tabCtrl = TabController(length: 2, vsync: this);
-    // mounted check para hindi mag-setState pag disposed na
     _tabCtrl.addListener(() {
+      // clear error pag nagpalit ng tab
       if (mounted) setState(() => _errorText = null);
     });
 
-    // gentle float — up and down lang, walang bounce na masyado
+    // yung float animation ng logo — pataas pababa
     _floatCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
@@ -56,7 +56,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   @override
   void dispose() {
-    // stop the animation first before disposing — para hindi mag-tick after dispose
+    // stop muna bago i-dispose para hindi mag-error
     _floatCtrl.stop();
     _tabCtrl.dispose();
     _nameCtrl.dispose();
@@ -72,12 +72,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     final pass = _passCtrl.text;
 
     if (email.isEmpty || pass.isEmpty) {
-      setState(() => _errorText = 'Input please! ✏️');
+      setState(() => _errorText = 'Please fill in all fields. ✏️');
       return;
     }
+
     setState(() { _isLoading = true; _errorText = null; });
     try {
       await _auth.signIn(email: email, password: pass);
+      // AuthWrapper sa main.dart na bahala sa redirect
     } on FirebaseAuthException catch (e) {
       if (mounted) setState(() => _errorText = AuthService.friendlyError(e));
     } finally {
@@ -91,8 +93,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     final pass = _passCtrl.text;
     final confirm = _confirmCtrl.text;
 
+    // validation checks
     if (name.isEmpty || email.isEmpty || pass.isEmpty || confirm.isEmpty) {
-      setState(() => _errorText = 'Input please! ✏️');
+      setState(() => _errorText = 'Please fill in all fields. ✏️');
       return;
     }
     if (name.length > 10) {
@@ -107,8 +110,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       setState(() => _errorText = 'Password can only be up to 12 characters! ✂️');
       return;
     }
+    // letters and numbers only — no special characters
     if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(pass)) {
-      setState(() => _errorText = 'No special characters in password please! 🙅');
+      setState(() => _errorText = 'No special characters in password! 🙅');
       return;
     }
     if (pass != confirm) {
@@ -131,6 +135,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     return Scaffold(
       backgroundColor: Colors.white,
       body: Container(
+        // bg.png as background
         decoration: const BoxDecoration(
           image: DecorationImage(
             image: AssetImage('assets/bg.png'),
@@ -138,219 +143,200 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           ),
         ),
         child: SafeArea(
-          child: Stack(
-            children: [
-              // clean white background — 
+          child: Center(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // wide screen = logo sa kaliwa, form sa kanan (side by side)
+                // narrow screen = stacked (para sa mobile)
+                final isWide = constraints.maxWidth > 700;
 
-              Center(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    // wide screen (desktop/browser) — logo kaliwa, form kanan
-                    final isWide = constraints.maxWidth > 700;
+                // floating logo animation
+                final floatingLogo = AnimatedBuilder(
+                  animation: _floatAnim,
+                  builder: (_, __) => Transform.translate(
+                    offset: Offset(0, _floatAnim.value),
+                    child: Image.asset(
+                      'assets/logo.png',
+                      height: constraints.maxHeight * 0.28,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                );
 
-                    final floatingLogo = AnimatedBuilder(
-                      animation: _floatAnim,
-                      builder: (_, __) => Transform.translate(
-                        offset: Offset(0, _floatAnim.value),
-                        child: Image.asset(
-                          'assets/logo.png',
-                          // narrow screen — smaller
-                          height: constraints.maxHeight * 0.28,
-                          fit: BoxFit.contain,
+                // the login/register card
+                final formCard = _buildFormCard();
+
+                if (isWide) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // logo takes up the left side
+                        Expanded(
+                          flex: 6,
+                          child: Center(
+                            child: AnimatedBuilder(
+                              animation: _floatAnim,
+                              builder: (_, __) => Transform.translate(
+                                offset: Offset(0, _floatAnim.value),
+                                child: Image.asset(
+                                  'assets/logo.png',
+                                  height: constraints.maxHeight * 0.85,
+                                  width: constraints.maxWidth * 0.52,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    );
-
-                    final formCard = Container(
-                      constraints: const BoxConstraints(maxWidth: 400),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(32),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFFF6B9D).withOpacity(0.15),
-                            blurRadius: 24,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // tab switcher
-                          Container(
-                            margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF0F5),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: TabBar(
-                              controller: _tabCtrl,
-                              indicator: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFFFF6B9D), Color(0xFFFF8E53)],
-                                ),
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                              indicatorSize: TabBarIndicatorSize.tab,
-                              dividerColor: Colors.transparent,
-                              labelStyle: GoogleFonts.nunito(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                              ),
-                              unselectedLabelStyle: GoogleFonts.nunito(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              labelColor: Colors.white,
-                              unselectedLabelColor: const Color(0xFFFF6B9D),
-                              tabs: const [
-                                Tab(text: '🔑  Sign In'),
-                                Tab(text: '🌟  Register'),
-                              ],
-                            ),
-                          ),
-
-                          // form fields — fixed height per tab, no scroll
-                          SizedBox(
-                            height: _tabCtrl.index == 0 ? 200 : 340,
-                            child: TabBarView(
-                              controller: _tabCtrl,
-                              children: [
-                                _SignInForm(
-                                  emailCtrl: _emailCtrl,
-                                  passCtrl: _passCtrl,
-                                  obscurePass: _obscurePass,
-                                  onTogglePass: () => setState(
-                                      () => _obscurePass = !_obscurePass),
-                                  onSubmit: _signIn,
-                                ),
-                                _RegisterForm(
-                                  nameCtrl: _nameCtrl,
-                                  emailCtrl: _emailCtrl,
-                                  passCtrl: _passCtrl,
-                                  confirmCtrl: _confirmCtrl,
-                                  obscurePass: _obscurePass,
-                                  obscureConfirm: _obscureConfirm,
-                                  onTogglePass: () => setState(
-                                      () => _obscurePass = !_obscurePass),
-                                  onToggleConfirm: () => setState(
-                                      () => _obscureConfirm = !_obscureConfirm),
-                                  onSubmit: _register,
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // error box
-                          if (_errorText != null)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFEEEE),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                      color: const Color(0xFFFF6B6B)
-                                          .withOpacity(0.4)),
-                                ),
-                                child: Text(
-                                  _errorText!,
-                                  textAlign: TextAlign.center,
-                                  style: GoogleFonts.nunito(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFFFF4444),
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                          // submit button
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-                            child: _isLoading
-                                ? const Center(
-                                    child: CircularProgressIndicator(
-                                        color: Color(0xFFFF6B9D)))
-                                : _HoverButton(
-                                    onTap: _tabCtrl.index == 0
-                                        ? _signIn
-                                        : _register,
-                                    label: _tabCtrl.index == 0
-                                        ? '🖌️  Let\'s Paint!'
-                                        : '🌈  Create Account!',
-                                  ),
-                          ),
-                        ],
-                      ),
-                    );
-
-                    if (isWide) {
-                      // side by side — logo left, form right
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              flex: 6,
-                              child: Center(
-                                child: AnimatedBuilder(
-                                  animation: _floatAnim,
-                                  builder: (_, __) => Transform.translate(
-                                    offset: Offset(0, _floatAnim.value),
-                                    child: Image.asset(
-                                      'assets/logo.png',
-                                      // fill ~85% of the available height
-                                      height: constraints.maxHeight * 0.85,
-                                      width: constraints.maxWidth * 0.52,
-                                      fit: BoxFit.contain,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              flex: 4,
-                              child: Center(child: formCard),
-                            ),
-                          ],
+                        const SizedBox(width: 16),
+                        // form on the right
+                        Expanded(
+                          flex: 4,
+                          child: Center(child: formCard),
                         ),
-                      );
-                    }
+                      ],
+                    ),
+                  );
+                }
 
-                    // narrow screen — stacked, with scroll just in case
-                    return SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 16),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          floatingLogo,
-                          const SizedBox(height: 20),
-                          formCard,
-                          const SizedBox(height: 20),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
+                // narrow/mobile layout
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      floatingLogo,
+                      const SizedBox(height: 20),
+                      formCard,
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ),
     );
   }
+
+  // separated this out para hindi masyadong mahabang build method
+  Widget _buildFormCard() {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 400),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF6B9D).withOpacity(0.15),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // tab bar — Sign In / Register
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF0F5),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: TabBar(
+              controller: _tabCtrl,
+              indicator: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFF6B9D), Color(0xFFFF8E53)],
+                ),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              labelStyle: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w800),
+              unselectedLabelStyle: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w600),
+              labelColor: Colors.white,
+              unselectedLabelColor: const Color(0xFFFF6B9D),
+              tabs: const [
+                Tab(text: '🔑  Sign In'),
+                Tab(text: '🌟  Register'),
+              ],
+            ),
+          ),
+
+          // form fields
+          SizedBox(
+            height: _tabCtrl.index == 0 ? 200 : 380,
+            child: TabBarView(
+              controller: _tabCtrl,
+              children: [
+                _SignInForm(
+                  emailCtrl: _emailCtrl,
+                  passCtrl: _passCtrl,
+                  obscurePass: _obscurePass,
+                  onTogglePass: () => setState(() => _obscurePass = !_obscurePass),
+                  onSubmit: _signIn,
+                ),
+                _RegisterForm(
+                  nameCtrl: _nameCtrl,
+                  emailCtrl: _emailCtrl,
+                  passCtrl: _passCtrl,
+                  confirmCtrl: _confirmCtrl,
+                  obscurePass: _obscurePass,
+                  obscureConfirm: _obscureConfirm,
+                  onTogglePass: () => setState(() => _obscurePass = !_obscurePass),
+                  onToggleConfirm: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                  onSubmit: _register,
+                ),
+              ],
+            ),
+          ),
+
+          // error message — lalabas lang kung may error
+          if (_errorText != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFEEEE),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFFF6B6B).withOpacity(0.4)),
+                ),
+                child: Text(
+                  _errorText!,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.nunito(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFFFF4444),
+                  ),
+                ),
+              ),
+            ),
+
+          // submit button
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B9D)))
+                : _HoverButton(
+                    onTap: _tabCtrl.index == 0 ? _signIn : _register,
+                    label: _tabCtrl.index == 0 ? '🖌️  Let\'s Paint!' : '🌈  Create Account!',
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-// --- main submit button with hover + press effect ---
-
+// submit button with hover and press effects
 class _HoverButton extends StatefulWidget {
   final VoidCallback onTap;
   final String label;
@@ -366,11 +352,6 @@ class _HoverButtonState extends State<_HoverButton> {
 
   @override
   Widget build(BuildContext context) {
-    // shadow gets bigger on hover, smaller on press
-    final shadowBlur = _pressed ? 6.0 : (_hovered ? 22.0 : 14.0);
-    final shadowOffset = _pressed ? const Offset(0, 2) : const Offset(0, 6);
-    final scale = _pressed ? 0.97 : (_hovered ? 1.02 : 1.0);
-
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -385,7 +366,7 @@ class _HoverButtonState extends State<_HoverButton> {
         },
         onTapCancel: () => setState(() => _pressed = false),
         child: AnimatedScale(
-          scale: scale,
+          scale: _pressed ? 0.97 : (_hovered ? 1.02 : 1.0),
           duration: const Duration(milliseconds: 120),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
@@ -399,8 +380,8 @@ class _HoverButtonState extends State<_HoverButton> {
               boxShadow: [
                 BoxShadow(
                   color: const Color(0xFFFF6B9D).withOpacity(_hovered ? 0.55 : 0.35),
-                  blurRadius: shadowBlur,
-                  offset: shadowOffset,
+                  blurRadius: _pressed ? 6 : (_hovered ? 22 : 14),
+                  offset: _pressed ? const Offset(0, 2) : const Offset(0, 6),
                 ),
               ],
             ),
@@ -421,8 +402,7 @@ class _HoverButtonState extends State<_HoverButton> {
   }
 }
 
-// --- Sign In form ---
-
+// sign in form — email + password lang
 class _SignInForm extends StatelessWidget {
   final TextEditingController emailCtrl;
   final TextEditingController passCtrl;
@@ -472,8 +452,7 @@ class _SignInForm extends StatelessWidget {
   }
 }
 
-// --- Register form --- 
-
+// register form — name, email, password, confirm
 class _RegisterForm extends StatelessWidget {
   final TextEditingController nameCtrl;
   final TextEditingController emailCtrl;
@@ -500,9 +479,8 @@ class _RegisterForm extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _AuthField(
             controller: nameCtrl,
@@ -566,8 +544,7 @@ class _RegisterForm extends StatelessWidget {
   }
 }
 
-// --- reusable text field ---
-
+// reusable text field used by both sign in and register forms
 class _AuthField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
@@ -629,4 +606,3 @@ class _AuthField extends StatelessWidget {
     );
   }
 }
-

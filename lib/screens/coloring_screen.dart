@@ -17,7 +17,10 @@ import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../widgets/color_palette.dart';
 
-// checks kung yung pixel ay outline (dark/black)
+// tolerance value for color matching — how similar colors need to be to fill
+const int _kFillTolerance = 30;
+
+// checks if a pixel is a dark outline — we don't fill these
 bool _isOutline(int argb) {
   final r = (argb >> 16) & 0xFF;
   final g = (argb >> 8) & 0xFF;
@@ -25,47 +28,43 @@ bool _isOutline(int argb) {
   return (r + g + b) ~/ 3 < 80;
 }
 
-// checks kung dalawang colors ay halos magkapareho (within tolerance)
-bool _matches(int a, int b, int tol) {
+// checks if two colors are close enough to be considered the same
+bool _matches(int a, int b) {
   final dr = ((a >> 16) & 0xFF) - ((b >> 16) & 0xFF);
   final dg = ((a >> 8) & 0xFF) - ((b >> 8) & 0xFF);
   final db = (a & 0xFF) - (b & 0xFF);
-  return dr.abs() <= tol && dg.abs() <= tol && db.abs() <= tol;
+  return dr.abs() <= _kFillTolerance && dg.abs() <= _kFillTolerance && db.abs() <= _kFillTolerance;
 }
 
-// flood fill algorithm — yung pag-tap mo sa isang area, mapupuno ng kulay
-// parang paint bucket tool sa MS Paint hehe
+// BFS flood fill — fills a region with the selected color
+// same idea as the paint bucket tool in MS Paint
 Uint32List floodFill(Uint32List pixels, int w, int h, int x, int y, Color c) {
   final fill = (c.alpha << 24) | (c.red << 16) | (c.green << 8) | c.blue;
   final target = pixels[y * w + x];
 
-  // wag mag-fill kung outline or same color na
+  // don't fill outlines or same-colored areas
   if (_isOutline(target)) return Uint32List.fromList(pixels);
-  if (_matches(target, fill, 30)) return Uint32List.fromList(pixels);
+  if (_matches(target, fill)) return Uint32List.fromList(pixels);
 
   final result = Uint32List.fromList(pixels);
   final visited = List<bool>.filled(w * h, false);
   final queue = Queue<int>();
-  final start = y * w + x;
-  queue.add(start);
-  visited[start] = true;
+
+  queue.add(y * w + x);
+  visited[y * w + x] = true;
 
   while (queue.isNotEmpty) {
     final idx = queue.removeFirst();
     result[idx] = fill;
-    final cx = idx % w, cy = idx ~/ w;
+    final cx = idx % w;
+    final cy = idx ~/ w;
 
-    // check 4 directions — up, down, left, right
-    for (final (nx, ny) in [
-      (cx + 1, cy),
-      (cx - 1, cy),
-      (cx, cy + 1),
-      (cx, cy - 1),
-    ]) {
+    // check all 4 neighbors
+    for (final (nx, ny) in [(cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)]) {
       if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
       final ni = ny * w + nx;
       if (visited[ni] || _isOutline(result[ni])) continue;
-      if (_matches(result[ni], target, 30)) {
+      if (_matches(result[ni], target)) {
         visited[ni] = true;
         queue.add(ni);
       }
@@ -74,13 +73,26 @@ Uint32List floodFill(Uint32List pixels, int w, int h, int x, int y, Color c) {
   return result;
 }
 
-// filename format: name_template_date.png
-String _fileName(String userName, String template, DateTime date) {
-  final s = userName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
-  return '${s}_${template}_${DateFormat('yyyyMMdd').format(date)}.png';
+// converts ARGB pixel buffer to RGBA bytes (needed for PNG encoding)
+Uint8List _argbToRgba(Uint32List pixels) {
+  final rgba = Uint8List(pixels.length * 4);
+  for (int i = 0; i < pixels.length; i++) {
+    final argb = pixels[i];
+    rgba[i * 4]     = (argb >> 16) & 0xFF; // R
+    rgba[i * 4 + 1] = (argb >> 8)  & 0xFF; // G
+    rgba[i * 4 + 2] =  argb        & 0xFF; // B
+    rgba[i * 4 + 3] = (argb >> 24) & 0xFF; // A
+  }
+  return rgba;
 }
 
-// i-download yung artwork as PNG sa browser
+// generates the download filename
+String _fileName(String userName, String template, DateTime date) {
+  final clean = userName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
+  return '${clean}_${template}_${DateFormat('yyyyMMdd').format(date)}.png';
+}
+
+// triggers a PNG download in the browser
 Future<String> saveArtworkWeb({
   required Uint32List pixels,
   required int width,
@@ -88,24 +100,14 @@ Future<String> saveArtworkWeb({
   required String userName,
   required String templateName,
 }) async {
-  // convert ARGB → RGBA bytes para sa PNG encoding
-  final rgba = Uint8List(width * height * 4);
-  for (int i = 0; i < width * height; i++) {
-    final argb = pixels[i];
-    rgba[i * 4] = (argb >> 16) & 0xFF;
-    rgba[i * 4 + 1] = (argb >> 8) & 0xFF;
-    rgba[i * 4 + 2] = argb & 0xFF;
-    rgba[i * 4 + 3] = (argb >> 24) & 0xFF;
-  }
+  final rgba = _argbToRgba(pixels);
 
   final completer = Completer<ui.Image>();
-  ui.decodeImageFromPixels(
-      rgba, width, height, ui.PixelFormat.rgba8888, completer.complete);
+  ui.decodeImageFromPixels(rgba, width, height, ui.PixelFormat.rgba8888, completer.complete);
   final image = await completer.future;
   final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
   final pngBytes = byteData!.buffer.asUint8List();
 
-  // trigger yung browser download
   final fileName = _fileName(userName, templateName, DateTime.now());
   final blob = html.Blob([pngBytes], 'image/png');
   final url = html.Url.createObjectUrlFromBlob(blob);
@@ -117,7 +119,7 @@ Future<String> saveArtworkWeb({
   return fileName;
 }
 
-// painter na nag-draw ng image sa canvas
+// draws the pixel image onto the canvas widget
 class _CanvasPainter extends CustomPainter {
   final ui.Image image;
   _CanvasPainter(this.image);
@@ -136,9 +138,7 @@ class _CanvasPainter extends CustomPainter {
   bool shouldRepaint(_CanvasPainter old) => old.image != image;
 }
 
-// ---------------------------------------------------------------------------
-// ColoringScreen — dito nangyayari yung actual coloring
-// ---------------------------------------------------------------------------
+// main coloring screen
 class ColoringScreen extends StatefulWidget {
   const ColoringScreen({
     super.key,
@@ -161,7 +161,7 @@ class ColoringScreen extends StatefulWidget {
 
 class _ColoringScreenState extends State<ColoringScreen> {
   Uint32List? _pixels;
-  Uint32List? _originalPixels; // para sa reset
+  Uint32List? _originalPixels; // saved for reset
   ui.Image? _canvasImage;
   int _canvasW = 0, _canvasH = 0;
   Color _selectedColor = const Color(0xFFE85D5D);
@@ -178,7 +178,6 @@ class _ColoringScreenState extends State<ColoringScreen> {
 
   Future<void> _loadSvg() async {
     final size = MediaQuery.of(context).size;
-    // canvas size based sa viewport — may room para sa toolbar at palette
     final targetW = (size.width * 0.9).round().clamp(300, 1200);
     final targetH = (size.height * 0.7).round().clamp(300, 900);
 
@@ -190,15 +189,12 @@ class _ColoringScreenState extends State<ColoringScreen> {
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
 
-      // SVG para mag-fit sa canvas nang hindi nag-distort
+      // scale SVG to fit canvas without distorting
       final scale = min(targetW / info.size.width, targetH / info.size.height);
 
-      // i-center yung SVG sa loob ng canvas — OKS 
-      final scaledW = info.size.width * scale;
-      final scaledH = info.size.height * scale;
-      final offsetX = (targetW - scaledW) / 2;
-      final offsetY = (targetH - scaledH) / 2;
-
+      // center the SVG inside the canvas
+      final offsetX = (targetW - info.size.width * scale) / 2;
+      final offsetY = (targetH - info.size.height * scale) / 2;
       canvas.translate(offsetX, offsetY);
       canvas.scale(scale, scale);
       canvas.drawPicture(info.picture);
@@ -207,12 +203,10 @@ class _ColoringScreenState extends State<ColoringScreen> {
       final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
       final rgba = byteData!.buffer.asUint8List();
 
+      // convert RGBA to ARGB for our pixel buffer
       final pixels = Uint32List(targetW * targetH);
       for (int i = 0; i < pixels.length; i++) {
-        pixels[i] = (rgba[i * 4 + 3] << 24) |
-            (rgba[i * 4] << 16) |
-            (rgba[i * 4 + 1] << 8) |
-            rgba[i * 4 + 2];
+        pixels[i] = (rgba[i * 4 + 3] << 24) | (rgba[i * 4] << 16) | (rgba[i * 4 + 1] << 8) | rgba[i * 4 + 2];
       }
 
       setState(() {
@@ -224,31 +218,22 @@ class _ColoringScreenState extends State<ColoringScreen> {
       });
       _refreshImage(pixels, targetW, targetH);
     } catch (e) {
-      // kung may error sa pag-load ng SVG
       if (!mounted) return;
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
         builder: (_) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Text('Oops! 😅',
-              style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
-          content: Text("Couldn't load template. Please try again.",
-              style: GoogleFonts.nunito(fontSize: 16)),
+          title: Text('Oops! 😅', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+          content: Text("Couldn't load template. Please try again.", style: GoogleFonts.nunito(fontSize: 16)),
           actions: [
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFF6B9D),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
-              },
-              child: Text('OK',
-                  style: GoogleFonts.nunito(
-                      fontWeight: FontWeight.w800, color: Colors.white)),
+              onPressed: () { Navigator.of(context).pop(); Navigator.of(context).pop(); },
+              child: Text('OK', style: GoogleFonts.nunito(fontWeight: FontWeight.w800, color: Colors.white)),
             ),
           ],
         ),
@@ -256,34 +241,24 @@ class _ColoringScreenState extends State<ColoringScreen> {
     }
   }
 
-  // i-convert yung pixel buffer pabalik sa ui.Image para ma-display
+  // converts pixel buffer back to a displayable image
   void _refreshImage(Uint32List pixels, int w, int h) {
-    final rgba = Uint8List(w * h * 4);
-    for (int i = 0; i < w * h; i++) {
-      final argb = pixels[i];
-      rgba[i * 4] = (argb >> 16) & 0xFF;
-      rgba[i * 4 + 1] = (argb >> 8) & 0xFF;
-      rgba[i * 4 + 2] = argb & 0xFF;
-      rgba[i * 4 + 3] = (argb >> 24) & 0xFF;
-    }
+    final rgba = _argbToRgba(pixels);
     ui.decodeImageFromPixels(rgba, w, h, ui.PixelFormat.rgba8888, (img) {
       if (mounted) setState(() => _canvasImage = img);
     });
   }
 
-  // pag-tap sa canvas — i-flood fill yung tapped area
+  // called when user taps the canvas
   void _onTap(TapDownDetails details, BoxConstraints constraints) {
     final buf = _pixels;
     if (buf == null) return;
 
-    final px = (details.localPosition.dx * _canvasW / constraints.maxWidth)
-        .round()
-        .clamp(0, _canvasW - 1);
-    final py = (details.localPosition.dy * _canvasH / constraints.maxHeight)
-        .round()
-        .clamp(0, _canvasH - 1);
+    // convert tap position to pixel coordinates
+    final px = (details.localPosition.dx * _canvasW / constraints.maxWidth).round().clamp(0, _canvasW - 1);
+    final py = (details.localPosition.dy * _canvasH / constraints.maxHeight).round().clamp(0, _canvasH - 1);
 
-    // save sa undo stack bago mag-fill
+    // save current state for undo
     _undoStack.add(Uint32List.fromList(buf));
     if (_undoStack.length > 20) _undoStack.removeAt(0);
 
@@ -300,10 +275,9 @@ class _ColoringScreenState extends State<ColoringScreen> {
   }
 
   void _reset() {
-    final orig = _originalPixels;
-    if (orig == null) return;
+    if (_originalPixels == null) return;
     _undoStack.clear();
-    final fresh = Uint32List.fromList(orig);
+    final fresh = Uint32List.fromList(_originalPixels!);
     setState(() => _pixels = fresh);
     _refreshImage(fresh, _canvasW, _canvasH);
   }
@@ -314,7 +288,6 @@ class _ColoringScreenState extends State<ColoringScreen> {
     setState(() => _isSaving = true);
 
     try {
-      // i-download yung PNG
       final fileName = await saveArtworkWeb(
         pixels: buf,
         width: _canvasW,
@@ -323,15 +296,13 @@ class _ColoringScreenState extends State<ColoringScreen> {
         templateName: widget.templateName,
       );
 
-      // i-save yung metadata sa local storage (SharedPreferences)
+      // save metadata to local storage so it shows in gallery
       final uid = AuthService().currentUser?.uid;
       if (uid != null) {
         await FirestoreService().saveArtwork(
           uid: uid,
           templateName: widget.templateName,
-          displayName: widget.templateDisplayName.isNotEmpty
-              ? widget.templateDisplayName
-              : widget.templateName,
+          displayName: widget.templateDisplayName.isNotEmpty ? widget.templateDisplayName : widget.templateName,
           emoji: widget.templateEmoji,
         );
       }
@@ -352,16 +323,13 @@ class _ColoringScreenState extends State<ColoringScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       behavior: SnackBarBehavior.floating,
       margin: const EdgeInsets.all(16),
-      content: Text(msg,
-          style: GoogleFonts.nunito(
-              fontWeight: FontWeight.w700, color: Colors.white)),
+      content: Text(msg, style: GoogleFonts.nunito(fontWeight: FontWeight.w700, color: Colors.white)),
     ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final title =
-        widget.templateName[0].toUpperCase() + widget.templateName.substring(1);
+    final title = widget.templateName[0].toUpperCase() + widget.templateName.substring(1);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -373,38 +341,23 @@ class _ColoringScreenState extends State<ColoringScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('$title 🖌️',
-            style: GoogleFonts.pacifico(fontSize: 22, color: Colors.white)),
+        title: Text('$title 🖌️', style: GoogleFonts.pacifico(fontSize: 22, color: Colors.white)),
         actions: [
+          _ToolBtn(icon: Icons.undo_rounded, label: 'Undo', color: const Color(0xFFFFD700),
+              enabled: _undoStack.isNotEmpty, onTap: _undoStack.isEmpty ? null : _undo),
+          _ToolBtn(icon: Icons.refresh_rounded, label: 'Reset', color: const Color(0xFFFF8E53),
+              enabled: _pixels != null, onTap: _pixels == null ? null : _reset),
           _ToolBtn(
-            icon: Icons.undo_rounded,
-            label: 'Undo',
-            color: const Color(0xFFFFD700),
-            enabled: _undoStack.isNotEmpty,
-            onTap: _undoStack.isEmpty ? null : _undo,
-          ),
-          _ToolBtn(
-            icon: Icons.refresh_rounded,
-            label: 'Reset',
-            color: const Color(0xFFFF8E53),
-            enabled: _pixels != null,
-            onTap: _pixels == null ? null : _reset,
-          ),
-          _ToolBtn(
-            icon: _isSaving
-                ? Icons.hourglass_top_rounded
-                : Icons.download_rounded,
-            label: 'Save',
-            color: const Color(0xFF4CAF7D),
-            enabled: _pixels != null && !_isSaving,
-            onTap: (_pixels == null || _isSaving) ? null : _save,
-          ),
+              icon: _isSaving ? Icons.hourglass_top_rounded : Icons.download_rounded,
+              label: 'Save', color: const Color(0xFF4CAF7D),
+              enabled: _pixels != null && !_isSaving,
+              onTap: (_pixels == null || _isSaving) ? null : _save),
           const SizedBox(width: 6),
         ],
       ),
       body: Column(
         children: [
-          // zoom slider
+          // zoom slider bar
           Container(
             color: const Color(0xFF7B68EE).withOpacity(0.08),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
@@ -412,58 +365,37 @@ class _ColoringScreenState extends State<ColoringScreen> {
               children: [
                 const Text('🔍', style: TextStyle(fontSize: 18)),
                 const SizedBox(width: 6),
-                Text('Zoom',
-                    style: GoogleFonts.nunito(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF7B68EE))),
+                Text('Zoom', style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: const Color(0xFF7B68EE))),
                 Expanded(
                   child: SliderTheme(
                     data: SliderTheme.of(context).copyWith(
                       activeTrackColor: const Color(0xFF7B68EE),
-                      inactiveTrackColor:
-                          const Color(0xFF7B68EE).withOpacity(0.2),
+                      inactiveTrackColor: const Color(0xFF7B68EE).withOpacity(0.2),
                       thumbColor: const Color(0xFFFF6B9D),
                       overlayColor: const Color(0xFFFF6B9D).withOpacity(0.2),
-                      thumbShape:
-                          const RoundSliderThumbShape(enabledThumbRadius: 10),
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
                     ),
-                    child: Slider(
-                      value: _zoom,
-                      min: 0.4,
-                      max: 1.5,
-                      divisions: 22,
-                      onChanged: (v) => setState(() => _zoom = v),
-                    ),
+                    child: Slider(value: _zoom, min: 0.4, max: 1.5, divisions: 22,
+                        onChanged: (v) => setState(() => _zoom = v)),
                   ),
                 ),
                 Text('${(_zoom * 100).round()}%',
-                    style: GoogleFonts.nunito(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF7B68EE))),
+                    style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF7B68EE))),
                 const SizedBox(width: 8),
               ],
             ),
           ),
 
-          // canvas area — centered na ngayon, hindi na left-aligned
+          // canvas
           Expanded(
             child: _isLoading || _canvasImage == null
                 ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const CircularProgressIndicator(
-                            color: Color(0xFFFF6B9D)),
-                        const SizedBox(height: 16),
-                        Text('Loading your canvas... 🎨',
-                            style: GoogleFonts.nunito(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF7B68EE))),
-                      ],
-                    ),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      const CircularProgressIndicator(color: Color(0xFFFF6B9D)),
+                      const SizedBox(height: 16),
+                      Text('Loading your canvas... 🎨',
+                          style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w700, color: const Color(0xFF7B68EE))),
+                    ]),
                   )
                 : Center(
                     child: SingleChildScrollView(
@@ -477,11 +409,7 @@ class _ColoringScreenState extends State<ColoringScreen> {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF7B68EE).withOpacity(0.18),
-                                  blurRadius: 24,
-                                  offset: const Offset(0, 6),
-                                ),
+                                BoxShadow(color: const Color(0xFF7B68EE).withOpacity(0.18), blurRadius: 24, offset: const Offset(0, 6)),
                               ],
                             ),
                             clipBehavior: Clip.antiAlias,
@@ -489,8 +417,7 @@ class _ColoringScreenState extends State<ColoringScreen> {
                               builder: (ctx, constraints) => GestureDetector(
                                 onTapDown: (d) => _onTap(d, constraints),
                                 child: SizedBox.expand(
-                                  child: CustomPaint(
-                                      painter: _CanvasPainter(_canvasImage!)),
+                                  child: CustomPaint(painter: _CanvasPainter(_canvasImage!)),
                                 ),
                               ),
                             ),
@@ -501,17 +428,12 @@ class _ColoringScreenState extends State<ColoringScreen> {
                   ),
           ),
 
-          // color palette sa baba
+          // color palette at the bottom
           Container(
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 8,
-                    offset: Offset(0, -2)),
-              ],
+              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, -2))],
             ),
             child: ColorPalette(
               selectedColor: _selectedColor,
@@ -524,7 +446,7 @@ class _ColoringScreenState extends State<ColoringScreen> {
   }
 }
 
-// toolbar button sa appbar — may hover at press effect
+// toolbar button with hover and press effects
 class _ToolBtn extends StatefulWidget {
   final IconData icon;
   final String label;
@@ -532,13 +454,7 @@ class _ToolBtn extends StatefulWidget {
   final Color color;
   final VoidCallback? onTap;
 
-  const _ToolBtn({
-    required this.icon,
-    required this.label,
-    required this.enabled,
-    required this.color,
-    this.onTap,
-  });
+  const _ToolBtn({required this.icon, required this.label, required this.enabled, required this.color, this.onTap});
 
   @override
   State<_ToolBtn> createState() => _ToolBtnState();
@@ -550,20 +466,13 @@ class _ToolBtnState extends State<_ToolBtn> {
 
   @override
   Widget build(BuildContext context) {
-    final active = widget.enabled;
-
     return MouseRegion(
-      cursor: active ? SystemMouseCursors.click : SystemMouseCursors.basic,
-      onEnter: (_) { if (active) setState(() => _hovered = true); },
-      onExit: (_) {
-        if (mounted) setState(() { _hovered = false; _pressed = false; });
-      },
+      cursor: widget.enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      onEnter: (_) { if (widget.enabled) setState(() => _hovered = true); },
+      onExit: (_) { if (mounted) setState(() { _hovered = false; _pressed = false; }); },
       child: GestureDetector(
-        onTapDown: (_) { if (active) setState(() => _pressed = true); },
-        onTapUp: (_) {
-          setState(() => _pressed = false);
-          widget.onTap?.call();
-        },
+        onTapDown: (_) { if (widget.enabled) setState(() => _pressed = true); },
+        onTapUp: (_) { setState(() => _pressed = false); widget.onTap?.call(); },
         onTapCancel: () => setState(() => _pressed = false),
         child: AnimatedScale(
           scale: _pressed ? 0.93 : 1.0,
@@ -573,26 +482,16 @@ class _ToolBtnState extends State<_ToolBtn> {
             margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: active ? widget.color : Colors.white24,
+              color: widget.enabled ? widget.color : Colors.white24,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: active && _hovered
-                  ? [
-                      BoxShadow(
-                        color: widget.color.withOpacity(0.45),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      )
-                    ]
+              boxShadow: widget.enabled && _hovered
+                  ? [BoxShadow(color: widget.color.withOpacity(0.45), blurRadius: 10, offset: const Offset(0, 3))]
                   : [],
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Icon(widget.icon, color: Colors.white, size: 18),
               const SizedBox(width: 5),
-              Text(widget.label,
-                  style: GoogleFonts.nunito(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white)),
+              Text(widget.label, style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white)),
             ]),
           ),
         ),
@@ -600,5 +499,3 @@ class _ToolBtnState extends State<_ToolBtn> {
     );
   }
 }
-
-// TODO: check ko pa mamaya yung save behavior pag offline — donut forget!
