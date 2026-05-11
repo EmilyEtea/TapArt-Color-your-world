@@ -1,10 +1,12 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/auth_service.dart';
 import 'coloring_screen.dart';
-import 'gallery_screen.dart';
 
 // data class para sa bawat coloring template
 class _Template {
@@ -20,22 +22,138 @@ class _Template {
   });
 }
 
-// list ng available templates
 const _kTemplates = [
   _Template(name: 'butterfly', assetPath: 'assets/svg/butterfly.svg', displayName: 'Butterfly', emoji: '🦋'),
   _Template(name: 'house', assetPath: 'assets/svg/house.svg', displayName: 'House', emoji: '🏠'),
 ];
 
-// colors para sa cards
 const _kCardGradients = [
   [Color(0xFFFFD6E7), Color(0xFFFFB3C6)],
   [Color(0xFFD6EEFF), Color(0xFFB3D9FF)],
 ];
 const _kCardBorders = [Color(0xFFFF6B9D), Color(0xFF5BA8D4)];
 
-class HomeScreen extends StatelessWidget {
+// confetti piece data
+class _ConfettiPiece {
+  final double x;      // starting x (0.0 - 1.0 of screen width)
+  final double speed;  // fall speed
+  final double size;
+  final Color color;
+  final double wobble; // horizontal sway amount
+  final double wobbleSpeed;
+  double y = -0.05;    // current y position
+  double age = 0;      // how long it's been alive
+
+  _ConfettiPiece({
+    required this.x,
+    required this.speed,
+    required this.size,
+    required this.color,
+    required this.wobble,
+    required this.wobbleSpeed,
+  });
+}
+
+class HomeScreen extends StatefulWidget {
   final String userName;
   const HomeScreen({super.key, required this.userName});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  bool _showLogoPopup = false;
+  final List<_ConfettiPiece> _confetti = [];
+  Timer? _dismissTimer;
+  Timer? _confettiTimer;
+  late AnimationController _popupCtrl;
+  late Animation<double> _popupScale;
+  late Animation<double> _popupFade;
+  final _rng = Random();
+
+  // confetti colors
+  final _confettiColors = const [
+    Color(0xFFFF6B9D), Color(0xFFFF8E53), Color(0xFFFFD700),
+    Color(0xFF7B68EE), Color(0xFF4CAF7D), Color(0xFF5BA8D4),
+    Color(0xFFD468C8), Color(0xFFE85D5D),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _popupCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
+    _popupScale = CurvedAnimation(parent: _popupCtrl, curve: Curves.elasticOut);
+    _popupFade = CurvedAnimation(parent: _popupCtrl, curve: Curves.easeIn);
+  }
+
+  @override
+  void dispose() {
+    _dismissTimer?.cancel();
+    _confettiTimer?.cancel();
+    _popupCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onLogoTap() {
+    if (_showLogoPopup) return; // already showing
+
+    setState(() {
+      _showLogoPopup = true;
+      _confetti.clear();
+      // spawn initial confetti burst
+      for (int i = 0; i < 60; i++) {
+        _spawnConfetti();
+      }
+    });
+
+    _popupCtrl.forward(from: 0);
+
+    // keep spawning confetti every 200ms
+    _confettiTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      if (mounted) {
+        setState(() {
+          for (int i = 0; i < 8; i++) _spawnConfetti();
+          // move existing pieces down
+          for (final p in _confetti) {
+            p.y += p.speed;
+            p.age += 0.016;
+          }
+          // remove pieces that fell off screen
+          _confetti.removeWhere((p) => p.y > 1.1);
+        });
+      }
+    });
+
+    // dismiss after 10 seconds
+    _dismissTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted) {
+        _confettiTimer?.cancel();
+        _popupCtrl.reverse().then((_) {
+          if (mounted) setState(() { _showLogoPopup = false; _confetti.clear(); });
+        });
+      }
+    });
+  }
+
+  void _dismissPopup() {
+    _dismissTimer?.cancel();
+    _confettiTimer?.cancel();
+    _popupCtrl.reverse().then((_) {
+      if (mounted) setState(() { _showLogoPopup = false; _confetti.clear(); });
+    });
+  }
+
+  void _spawnConfetti() {
+    _confetti.add(_ConfettiPiece(
+      x: _rng.nextDouble(),
+      speed: 0.004 + _rng.nextDouble() * 0.006,
+      size: 6 + _rng.nextDouble() * 10,
+      color: _confettiColors[_rng.nextInt(_confettiColors.length)],
+      wobble: _rng.nextDouble() * 0.03,
+      wobbleSpeed: 1 + _rng.nextDouble() * 3,
+    ));
+  }
 
   Future<void> _confirmSignOut(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -62,7 +180,6 @@ class HomeScreen extends StatelessWidget {
     );
     if (confirmed == true) {
       await AuthService().signOut();
-      // AuthWrapper sa main.dart na bahala sa redirect
     }
   }
 
@@ -70,113 +187,175 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // top bar
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Row(
-                children: [
-                  _NavBtn(
-                    icon: Icons.photo_library_rounded,
-                    label: 'Gallery',
+      body: Stack(
+        children: [
+          // main content
+          SafeArea(
+            child: Column(
+              children: [
+                // top bar
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Row(
+                    children: [
+                      // tappable logo
+                      GestureDetector(
+                        onTap: _onLogoTap,
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: Image.asset('assets/logo.png', height: 80, fit: BoxFit.contain),
+                        ),
+                      ),
+                      const Spacer(),
+                      _NavBtn(
+                        icon: Icons.logout_rounded,
+                        label: 'Sign Out',
+                        color: const Color(0xFFFF8E53),
+                        onTap: () => _confirmSignOut(context),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // greeting banner
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  decoration: BoxDecoration(
                     color: const Color(0xFF7B68EE),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => GalleryScreen(userName: userName)),
-                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(color: const Color(0xFF7B68EE).withOpacity(0.35), blurRadius: 12, offset: const Offset(0, 5)),
+                    ],
                   ),
-                  const Spacer(),
-                  Image.asset('assets/logo.png', height: 64, fit: BoxFit.contain),
-                  const Spacer(),
-                  _NavBtn(
-                    icon: Icons.logout_rounded,
-                    label: 'Sign Out',
-                    color: const Color(0xFFFF8E53),
-                    onTap: () => _confirmSignOut(context),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('👋', style: TextStyle(fontSize: 26)),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: Text(
+                          'Hi, ${widget.userName}! Pick a picture to color!',
+                          style: GoogleFonts.nunito(fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
+                ),
+                const SizedBox(height: 10),
 
-            // greeting banner
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF7B68EE),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF7B68EE).withOpacity(0.35),
-                    blurRadius: 12,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('👋', style: TextStyle(fontSize: 26)),
-                  const SizedBox(width: 10),
-                  Flexible(
-                    child: Text(
-                      'Hi, $userName! Pick a picture to color!',
-                      style: GoogleFonts.nunito(fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
+                Text('Tap a card to start! 👇',
+                    style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: const Color(0xFFFF8E53))),
+                const SizedBox(height: 14),
 
-            Text(
-              'Tap a card to start! 👇',
-              style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: const Color(0xFFFF8E53)),
-            ),
-            const SizedBox(height: 14),
-
-            // template cards side by side
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: _kTemplates.asMap().entries.map((e) => Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: _TemplateCard(
-                        template: e.value,
-                        index: e.key,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ColoringScreen(
-                              userName: userName,
-                              assetPath: e.value.assetPath,
-                              templateName: e.value.name,
-                              templateEmoji: e.value.emoji,
-                              templateDisplayName: e.value.displayName,
+                // template cards
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: _kTemplates.asMap().entries.map((e) => Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: _TemplateCard(
+                            template: e.value,
+                            index: e.key,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ColoringScreen(
+                                  userName: widget.userName,
+                                  assetPath: e.value.assetPath,
+                                  templateName: e.value.name,
+                                  templateEmoji: e.value.emoji,
+                                  templateDisplayName: e.value.displayName,
+                                ),
+                              ),
                             ),
+                          ),
+                        ),
+                      )).toList(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+
+          // confetti + logo popup overlay
+          if (_showLogoPopup)
+            GestureDetector(
+              onTap: _dismissPopup,
+              child: Container(
+                color: Colors.black.withOpacity(0.45),
+                child: Stack(
+                  children: [
+                    // confetti pieces
+                    ..._confetti.map((p) {
+                      final screenW = MediaQuery.of(context).size.width;
+                      final screenH = MediaQuery.of(context).size.height;
+                      final xPos = p.x * screenW + sin(p.age * p.wobbleSpeed * pi) * p.wobble * screenW;
+                      return Positioned(
+                        left: xPos,
+                        top: p.y * screenH,
+                        child: Transform.rotate(
+                          angle: p.age * p.wobbleSpeed,
+                          child: Container(
+                            width: p.size,
+                            height: p.size * 0.5,
+                            decoration: BoxDecoration(
+                              color: p.color,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+
+                    // centered logo popup
+                    Center(
+                      child: FadeTransition(
+                        opacity: _popupFade,
+                        child: ScaleTransition(
+                          scale: _popupScale,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset('assets/logo.png', height: 380, fit: BoxFit.contain),
+                              const SizedBox(height: 16),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  'Tap anywhere to close 🎉',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFFFF6B9D),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
-                  )).toList(),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-          ],
-        ),
+        ],
       ),
     );
   }
 }
 
-// nav button — gallery and sign out
+// nav button with hover + press
 class _NavBtn extends StatefulWidget {
   final IconData icon;
   final String label;
@@ -197,9 +376,7 @@ class _NavBtnState extends State<_NavBtn> {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) {
-        if (mounted) setState(() { _hovered = false; _pressed = false; });
-      },
+      onExit: (_) { if (mounted) setState(() { _hovered = false; _pressed = false; }); },
       child: GestureDetector(
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) { setState(() => _pressed = false); widget.onTap(); },
@@ -230,7 +407,7 @@ class _NavBtnState extends State<_NavBtn> {
   }
 }
 
-// template card — butterfly or house
+// template card
 class _TemplateCard extends StatefulWidget {
   final _Template template;
   final int index;
@@ -253,9 +430,7 @@ class _TemplateCardState extends State<_TemplateCard> {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) {
-        if (mounted) setState(() { _hovered = false; _pressed = false; });
-      },
+      onExit: (_) { if (mounted) setState(() { _hovered = false; _pressed = false; }); },
       child: GestureDetector(
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) { setState(() => _pressed = false); widget.onTap(); },

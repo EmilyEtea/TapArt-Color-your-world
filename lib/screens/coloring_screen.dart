@@ -13,8 +13,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
-import '../services/auth_service.dart';
-import '../services/firestore_service.dart';
 import '../widgets/color_palette.dart';
 
 // tolerance value for color matching — how similar colors need to be to fill
@@ -295,17 +293,6 @@ class _ColoringScreenState extends State<ColoringScreen> {
         userName: widget.userName,
         templateName: widget.templateName,
       );
-
-      // save metadata to local storage so it shows in gallery
-      final uid = AuthService().currentUser?.uid;
-      if (uid != null) {
-        await FirestoreService().saveArtwork(
-          uid: uid,
-          templateName: widget.templateName,
-          displayName: widget.templateDisplayName.isNotEmpty ? widget.templateDisplayName : widget.templateName,
-          emoji: widget.templateEmoji,
-        );
-      }
 
       if (!mounted) return;
       _showSnack('🎉  Saved & downloading $fileName', const Color(0xFF4CAF7D));
